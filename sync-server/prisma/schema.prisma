@@ -1,0 +1,205 @@
+// Prisma schema for cloud sync server (PostgreSQL)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Store/Location
+model Store {
+  id        String   @id @default(uuid())
+  name      String
+  address   String?
+  phone     String?
+  email     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products       Product[]
+  categories     Category[]
+  sales          Sale[]
+  customers      Customer[]
+  users          User[]
+  settings       Setting[]
+  stockMovements StockMovement[]
+}
+
+model Product {
+  id            String   @id
+  storeId       String
+  store         Store    @relation(fields: [storeId], references: [id])
+  sku           String
+  barcode       String?
+  name          String
+  description   String?
+  categoryId    String
+  costPrice     Float    @default(0)
+  sellingPrice  Float
+  taxRate       Float    @default(0)
+  trackStock    Boolean  @default(true)
+  stockQuantity Int      @default(0)
+  lowStockAlert Int      @default(10)
+  unit          String   @default("pcs")
+  imageUrl      String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  saleItems      SaleItem[]
+  stockMovements StockMovement[]
+
+  @@unique([storeId, sku])
+}
+
+model Category {
+  id          String   @id
+  storeId     String
+  store       Store    @relation(fields: [storeId], references: [id])
+  name        String
+  description String?
+  color       String   @default("#8B4513")
+  icon        String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Customer {
+  id            String   @id
+  storeId       String
+  store         Store    @relation(fields: [storeId], references: [id])
+  name          String
+  phone         String?
+  email         String?
+  address       String?
+  loyaltyPoints Int      @default(0)
+  totalSpent    Float    @default(0)
+  visitCount    Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sales Sale[]
+
+  @@unique([storeId, phone])
+}
+
+model User {
+  id        String   @id
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id])
+  username  String
+  pin       String
+  password  String
+  firstName String
+  lastName  String
+  role      String   @default("cashier")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sales Sale[]
+
+  @@unique([storeId, username])
+}
+
+model Sale {
+  id             String   @id
+  storeId        String
+  store          Store    @relation(fields: [storeId], references: [id])
+  receiptNo      String   @unique
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  sessionId      String
+  customerId     String?
+  customer       Customer? @relation(fields: [customerId], references: [id])
+  subtotal       Float
+  taxAmount      Float    @default(0)
+  discountAmount Float    @default(0)
+  discountType   String?
+  totalAmount    Float
+  paymentMethod  String
+  amountPaid     Float
+  changeGiven    Float    @default(0)
+  status         String   @default("completed")
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  items    SaleItem[]
+  payments Payment[]
+}
+
+model SaleItem {
+  id          String  @id
+  saleId      String
+  sale        Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product @relation(fields: [productId], references: [id])
+  productName String
+  quantity    Int
+  unitPrice   Float
+  costPrice   Float
+  taxRate     Float   @default(0)
+  taxAmount   Float   @default(0)
+  discount    Float   @default(0)
+  total       Float
+  modifiers   String?
+  notes       String?
+}
+
+model Payment {
+  id        String   @id
+  saleId    String
+  sale      Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  method    String
+  amount    Float
+  reference String?
+  createdAt DateTime @default(now())
+}
+
+model StockMovement {
+  id          String   @id
+  storeId     String
+  store       Store    @relation(fields: [storeId], references: [id])
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  userId      String
+  type        String
+  quantity    Int
+  previousQty Int
+  newQty      Int
+  reason      String?
+  reference   String?
+  createdAt   DateTime @default(now())
+}
+
+model Setting {
+  id        String   @id
+  storeId   String
+  store     Store    @relation(fields: [storeId], references: [id])
+  key       String
+  value     String
+  type      String   @default("string")
+  category  String   @default("general")
+  updatedAt DateTime @updatedAt
+
+  @@unique([storeId, key])
+}
+
+model SyncLog {
+  id          String   @id @default(uuid())
+  syncId      String   @unique
+  storeId     String
+  tableName   String
+  recordId    String
+  operation   String
+  processedAt DateTime @default(now())
+
+  @@index([storeId, processedAt])
+}

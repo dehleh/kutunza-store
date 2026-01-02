@@ -1,0 +1,292 @@
+// Kutunza POS Database Schema
+// SQLite for offline-first capability
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./kutunza.db"
+}
+
+// ==================== USERS & AUTH ====================
+
+model User {
+  id          String   @id @default(uuid())
+  username    String   @unique
+  pin         String   // 4-6 digit PIN for quick login
+  password    String   // Hashed password for admin access
+  firstName   String
+  lastName    String
+  role        String   @default("cashier") // cashier, manager, admin
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  sales       Sale[]
+  sessions    Session[]
+  stockMovements StockMovement[]
+
+  // Sync fields
+  syncId      String   @unique @default(uuid())
+  syncStatus  String   @default("pending") // pending, synced, conflict
+  lastSyncAt  DateTime?
+}
+
+model Session {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  startedAt   DateTime @default(now())
+  endedAt     DateTime?
+  openingCash Float    @default(0)
+  closingCash Float?
+  isActive    Boolean  @default(true)
+
+  // Relations
+  sales       Sale[]
+
+  // Sync fields
+  syncId      String   @unique @default(uuid())
+  syncStatus  String   @default("pending")
+  lastSyncAt  DateTime?
+}
+
+// ==================== PRODUCTS & INVENTORY ====================
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  color       String    @default("#8B4513") // Kutunza brown
+  icon        String?
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  products    Product[]
+
+  // Sync fields
+  syncId      String    @unique @default(uuid())
+  syncStatus  String    @default("pending")
+  lastSyncAt  DateTime?
+}
+
+model Product {
+  id            String   @id @default(uuid())
+  sku           String   @unique
+  barcode       String?  @unique
+  name          String
+  description   String?
+  categoryId    String
+  category      Category @relation(fields: [categoryId], references: [id])
+  
+  // Pricing
+  costPrice     Float    @default(0)
+  sellingPrice  Float
+  taxRate       Float    @default(0) // Percentage
+  
+  // Inventory
+  trackStock    Boolean  @default(true)
+  stockQuantity Int      @default(0)
+  lowStockAlert Int      @default(10)
+  unit          String   @default("pcs") // pcs, kg, g, L, ml
+  
+  // Display
+  imageUrl      String?
+  sortOrder     Int      @default(0)
+  isActive      Boolean  @default(true)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  saleItems     SaleItem[]
+  stockMovements StockMovement[]
+  modifiers     ProductModifier[]
+
+  // Sync fields
+  syncId        String   @unique @default(uuid())
+  syncStatus    String   @default("pending")
+  lastSyncAt    DateTime?
+}
+
+model ProductModifier {
+  id          String   @id @default(uuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  name        String   // e.g., "Extra Spicy", "Large Size"
+  priceAdjustment Float @default(0)
+  isActive    Boolean  @default(true)
+  
+  // Sync fields
+  syncId      String   @unique @default(uuid())
+  syncStatus  String   @default("pending")
+  lastSyncAt  DateTime?
+}
+
+model StockMovement {
+  id          String   @id @default(uuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  type        String   // in, out, adjustment, transfer
+  quantity    Int
+  previousQty Int
+  newQty      Int
+  reason      String?
+  reference   String?  // PO number, sale ID, etc.
+  
+  createdAt   DateTime @default(now())
+
+  // Sync fields
+  syncId      String   @unique @default(uuid())
+  syncStatus  String   @default("pending")
+  lastSyncAt  DateTime?
+}
+
+// ==================== SALES & TRANSACTIONS ====================
+
+model Customer {
+  id          String   @id @default(uuid())
+  name        String
+  phone       String?  @unique
+  email       String?
+  address     String?
+  
+  // Loyalty
+  loyaltyPoints Int    @default(0)
+  totalSpent   Float   @default(0)
+  visitCount   Int     @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  sales       Sale[]
+
+  // Sync fields
+  syncId      String   @unique @default(uuid())
+  syncStatus  String   @default("pending")
+  lastSyncAt  DateTime?
+}
+
+model Sale {
+  id          String   @id @default(uuid())
+  receiptNo   String   @unique
+  
+  // Relations
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  sessionId   String
+  session     Session  @relation(fields: [sessionId], references: [id])
+  customerId  String?
+  customer    Customer? @relation(fields: [customerId], references: [id])
+  
+  // Amounts
+  subtotal    Float
+  taxAmount   Float    @default(0)
+  discountAmount Float @default(0)
+  discountType String? // percentage, fixed
+  totalAmount Float
+  
+  // Payment
+  paymentMethod String  // cash, card, transfer, split
+  amountPaid   Float
+  changeGiven  Float    @default(0)
+  
+  // Status
+  status      String   @default("completed") // pending, completed, voided, refunded
+  notes       String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  items       SaleItem[]
+  payments    Payment[]
+
+  // Sync fields
+  syncId      String   @unique @default(uuid())
+  syncStatus  String   @default("pending")
+  lastSyncAt  DateTime?
+}
+
+model SaleItem {
+  id          String   @id @default(uuid())
+  saleId      String
+  sale        Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  
+  productName String   // Snapshot at time of sale
+  quantity    Int
+  unitPrice   Float
+  costPrice   Float    // For profit calculation
+  taxRate     Float    @default(0)
+  taxAmount   Float    @default(0)
+  discount    Float    @default(0)
+  total       Float
+  
+  modifiers   String?  // JSON string of applied modifiers
+  notes       String?
+
+  // Sync fields
+  syncId      String   @unique @default(uuid())
+  syncStatus  String   @default("pending")
+  lastSyncAt  DateTime?
+}
+
+model Payment {
+  id          String   @id @default(uuid())
+  saleId      String
+  sale        Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  
+  method      String   // cash, card, transfer, mobile
+  amount      Float
+  reference   String?  // Transaction reference for card/transfer
+  
+  createdAt   DateTime @default(now())
+
+  // Sync fields
+  syncId      String   @unique @default(uuid())
+  syncStatus  String   @default("pending")
+  lastSyncAt  DateTime?
+}
+
+// ==================== SYNC QUEUE ====================
+
+model SyncQueue {
+  id          String   @id @default(uuid())
+  tableName   String
+  recordId    String
+  operation   String   // create, update, delete
+  data        String   // JSON payload
+  attempts    Int      @default(0)
+  lastError   String?
+  status      String   @default("pending") // pending, processing, completed, failed
+  createdAt   DateTime @default(now())
+  processedAt DateTime?
+}
+
+// ==================== SETTINGS ====================
+
+model Setting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  type        String   @default("string") // string, number, boolean, json
+  category    String   @default("general")
+  updatedAt   DateTime @updatedAt
+
+  // Sync fields
+  syncId      String   @unique @default(uuid())
+  syncStatus  String   @default("pending")
+  lastSyncAt  DateTime?
+}
