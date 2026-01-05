@@ -1,18 +1,21 @@
 # Configure nixpacks to build the sync-server from monorepo root
 [variables]
 NODE_ENV = "production"
+NIXPACKS_NODE_VERSION = "22"
 
 [phases.setup]
-nixPkgs = ["nodejs_22", "openssl"]
+nixPkgs = ["nodejs-22_x", "openssl"]
 
 [phases.install]
 cmds = [
-  "npm ci --workspace=sync-server"
+  "npm ci"
 ]
 
 [phases.build]
 cmds = [
-  "cd sync-server && npx prisma generate && npm run build"
+  "cd sync-server",
+  "npx prisma generate",
+  "npm run build"
 ]
 
 [start]

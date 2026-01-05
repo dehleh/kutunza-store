@@ -12,7 +12,7 @@
   "scripts": {
     "dev:all": "concurrently \"npm run dev --prefix sync-server\" \"npm run dev --prefix pos-web-app\" \"npm run dev --prefix customer-display\"",
     "build:all": "npm run build --prefix sync-server && npm run build --prefix pos-web-app && npm run build --prefix customer-display",
-    "build": "cd sync-server && npm ci && npx prisma generate && npm run build",
+    "build": "cd sync-server && npx prisma generate && npm run build",
     "start": "cd sync-server && npm start",
     "clean": "rm -rf */node_modules */dist */build .turbo",
     "setup": "npm install && npm install --prefix pos-web-app && npm install --prefix customer-display && npm install --prefix sync-server && npm install --prefix sync-server/admin-dashboard"
@@ -21,7 +21,7 @@
     "concurrently": "^8.2.2"
   },
   "engines": {
-    "node": ">=18.0.0",
+    "node": ">=22.0.0",
     "npm": ">=9.0.0"
   }
 }
