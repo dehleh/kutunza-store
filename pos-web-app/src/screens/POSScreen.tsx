@@ -57,7 +57,7 @@ export default function POSScreen() {
 
   // Barcode scanner listener
   useEffect(() => {
-    let timeout: NodeJS.Timeout;
+    let timeout: ReturnType<typeof setTimeout>;
 
     const handleKeyPress = (e: KeyboardEvent) => {
       // Ignore if in input field
