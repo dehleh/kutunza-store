@@ -1,5 +1,3 @@
-import React from 'react';
-
 export default function SettingsScreen() {
   return (
     <div className="min-h-screen bg-gray-100 p-8">
