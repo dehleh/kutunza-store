@@ -9,13 +9,115 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Store/Location
+// ==================== MULTI-TENANCY ====================
+
+// Company/Organization (Top-level tenant)
+model Company {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique // URL-friendly identifier
+  email       String   @unique
+  phone       String?
+  address     String?
+  logo        String?
+  website     String?
+  taxId       String?  // VAT/Tax registration number
+  
+  // Subscription
+  plan        String   @default("trial") // trial, basic, pro, enterprise
+  status      String   @default("active") // active, suspended, cancelled
+  maxStores   Int      @default(1)
+  maxUsers    Int      @default(5)
+  
+  // Billing
+  billingEmail    String?
+  billingAddress  String?
+  
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  stores         Store[]
+  platformAdmins PlatformAdmin[]
+  subscriptions  Subscription[]
+  
+  @@index([slug])
+  @@index([email])
+}
+
+// Platform administrators (can manage multiple companies)
+model PlatformAdmin {
+  id          String   @id @default(uuid())
+  companyId   String?  // null = super admin (manages all companies)
+  company     Company? @relation(fields: [companyId], references: [id])
+  
+  email       String   @unique
+  password    String   // bcrypt hashed
+  firstName   String
+  lastName    String
+  role        String   @default("company_admin") // super_admin, company_admin
+  
+  // Permissions
+  canManageCompanies Boolean @default(false)
+  canManageBilling   Boolean @default(false)
+  canViewAllStores   Boolean @default(false)
+  
+  isActive    Boolean  @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([email])
+  @@index([companyId])
+}
+
+// Subscription tracking
+model Subscription {
+  id              String   @id @default(uuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  
+  plan            String   // trial, basic, pro, enterprise
+  status          String   @default("active") // active, past_due, cancelled, expired
+  
+  // Billing cycle
+  billingCycle    String   @default("monthly") // monthly, yearly
+  amount          Float
+  currency        String   @default("USD")
+  
+  // Period
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  trialEndsAt        DateTime?
+  cancelAt           DateTime?
+  canceledAt         DateTime?
+  
+  // Payment
+  paymentMethod   String?  // stripe, paypal, manual
+  paymentReference String? // external payment ID
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([companyId])
+  @@index([status])
+}
+
+// Store/Location (now belongs to a company)
 model Store {
   id        String   @id @default(uuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  
   name      String
+  code      String?  // Internal store code
   address   String?
   phone     String?
   email     String?
+  timezone  String   @default("UTC")
+  currency  String   @default("USD")
+  
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -27,6 +129,9 @@ model Store {
   users          User[]
   settings       Setting[]
   stockMovements StockMovement[]
+  
+  @@unique([companyId, code])
+  @@index([companyId])
 }
 
 model Product {
@@ -164,7 +269,7 @@ model Payment {
 }
 
 model StockMovement {
-  id          String   @id
+  id          String   @id @default(uuid())
   storeId     String
   store       Store    @relation(fields: [storeId], references: [id])
   productId   String
@@ -202,4 +307,23 @@ model SyncLog {
   processedAt DateTime @default(now())
 
   @@index([storeId, processedAt])
+}
+
+// Audit Log for compliance and security tracking
+model AuditLog {
+  id         String   @id @default(uuid())
+  storeId    String
+  userId     String
+  action     String   // CREATE, UPDATE, DELETE, VOID, DISCOUNT, etc.
+  entityType String   // Product, Sale, User, Inventory, etc.
+  entityId   String
+  changes    Json?    // Before/After values
+  ipAddress  String?
+  userAgent  String?
+  metadata   Json?    // Additional context
+  createdAt  DateTime @default(now())
+
+  @@index([storeId, createdAt])
+  @@index([userId, createdAt])
+  @@index([entityType, entityId])
 }

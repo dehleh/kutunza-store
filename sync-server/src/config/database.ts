@@ -2,13 +2,22 @@
 import { PrismaClient } from '@prisma/client';
 import { logger } from '../config/logger';
 
-// Create Prisma client with logging
+// Create Prisma client with connection pooling and logging
 export const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL,
+    },
+  },
   log: [
     { emit: 'event', level: 'query' },
     { emit: 'event', level: 'error' },
     { emit: 'event', level: 'warn' },
   ],
+  // Connection pool configuration
+  // Note: Prisma uses connection pooling by default
+  // Adjust DATABASE_URL with connection_limit parameter if needed
+  // e.g., postgresql://user:pass@localhost:5432/db?connection_limit=10
 });
 
 // Log database queries in development

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kutunza API Tester</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 { color: #333; }
+        .endpoint {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover { background: #45a049; }
+        .error { background: #f44336; }
+        .info { background: #2196F3; }
+        pre {
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            max-height: 300px;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .result {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚀 Kutunza POS API Tester</h1>
+
+    <!-- Health Check -->
+    <div class="endpoint">
+        <h3>1. Health Check</h3>
+        <button onclick="testHealth()">Test Health</button>
+        <div id="health-result" class="result"></div>
+    </div>
+
+    <!-- Platform Login -->
+    <div class="endpoint">
+        <h3>2. Platform Admin Login</h3>
+        <input type="email" id="login-email" value="bamidele.ogunlade@cybercapsec.com" placeholder="Email">
+        <input type="password" id="login-password" value="Admin@2025" placeholder="Password">
+        <button onclick="testLogin()">Login</button>
+        <div id="login-result" class="result"></div>
+    </div>
+
+    <!-- Register Company -->
+    <div class="endpoint">
+        <h3>3. Register New Company</h3>
+        <input type="text" id="company-name" placeholder="Company Name" value="Test Company">
+        <input type="email" id="company-email" placeholder="Company Email" value="test@company.com">
+        <input type="text" id="admin-first" placeholder="Admin First Name" value="John">
+        <input type="text" id="admin-last" placeholder="Admin Last Name" value="Doe">
+        <input type="email" id="admin-email" placeholder="Admin Email" value="john@test.com">
+        <input type="password" id="admin-password" placeholder="Admin Password" value="Test@1234">
+        <button onclick="testRegister()">Register</button>
+        <div id="register-result" class="result"></div>
+    </div>
+
+    <!-- Get Metrics -->
+    <div class="endpoint">
+        <h3>4. System Metrics (Requires API Key)</h3>
+        <input type="text" id="api-key" placeholder="API Key" 
+               value="f374535cc03d04c3b2a7e17dfb2aad9a60dbd90f1151c1d7f34245f8c460352d">
+        <button onclick="testMetrics()" class="info">Get Metrics</button>
+        <div id="metrics-result" class="result"></div>
+    </div>
+
+    <!-- Get Alerts -->
+    <div class="endpoint">
+        <h3>5. Critical Alerts</h3>
+        <button onclick="testAlerts()" class="info">Get Alerts</button>
+        <div id="alerts-result" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000';
+
+        function displayResult(elementId, data, isError = false) {
+            const element = document.getElementById(elementId);
+            const color = isError ? '#f44336' : '#4CAF50';
+            element.innerHTML = `
+                <pre style="border-left: 4px solid ${color}">
+${JSON.stringify(data, null, 2)}
+                </pre>
+            `;
+        }
+
+        async function testHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                displayResult('health-result', data);
+            } catch (error) {
+                displayResult('health-result', { error: error.message }, true);
+            }
+        }
+
+        async function testLogin() {
+            try {
+                const email = document.getElementById('login-email').value;
+                const password = document.getElementById('login-password').value;
+
+                const response = await fetch(`${API_BASE}/api/platform/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displayResult('login-result', data);
+                    // Store token for later use
+                    sessionStorage.setItem('token', data.token);
+                } else {
+                    displayResult('login-result', data, true);
+                }
+            } catch (error) {
+                displayResult('login-result', { error: error.message }, true);
+            }
+        }
+
+        async function testRegister() {
+            try {
+                const body = {
+                    name: document.getElementById('company-name').value,
+                    email: document.getElementById('company-email').value,
+                    adminFirstName: document.getElementById('admin-first').value,
+                    adminLastName: document.getElementById('admin-last').value,
+                    adminEmail: document.getElementById('admin-email').value,
+                    adminPassword: document.getElementById('admin-password').value,
+                    plan: 'trial'
+                };
+
+                const response = await fetch(`${API_BASE}/api/companies/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+
+                const data = await response.json();
+                displayResult('register-result', data, !response.ok);
+            } catch (error) {
+                displayResult('register-result', { error: error.message }, true);
+            }
+        }
+
+        async function testMetrics() {
+            try {
+                const apiKey = document.getElementById('api-key').value;
+
+                const response = await fetch(`${API_BASE}/api/metrics`, {
+                    headers: { 'x-api-key': apiKey }
+                });
+
+                const data = await response.json();
+                displayResult('metrics-result', data, !response.ok);
+            } catch (error) {
+                displayResult('metrics-result', { error: error.message }, true);
+            }
+        }
+
+        async function testAlerts() {
+            try {
+                const apiKey = document.getElementById('api-key').value;
+
+                const response = await fetch(`${API_BASE}/api/alerts`, {
+                    headers: { 'x-api-key': apiKey }
+                });
+
+                const data = await response.json();
+                displayResult('alerts-result', data, !response.ok);
+            } catch (error) {
+                displayResult('alerts-result', { error: error.message }, true);
+            }
+        }
+
+        // Auto-test health on load
+        window.onload = () => testHealth();
+    </script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+// Audit Log Model Addition - Add this to schema.prisma
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  storeId     String
+  userId      String
+  action      String   // CREATE, UPDATE, DELETE, VOID, DISCOUNT, etc.
+  entityType  String   // Product, Sale, User, Inventory, etc.
+  entityId    String
+  changes     Json?    // Before/After values
+  ipAddress   String?
+  userAgent   String?
+  metadata    Json?    // Additional context
+  createdAt   DateTime @default(now())
+
+  @@index([storeId, createdAt])
+  @@index([userId, createdAt])
+  @@index([entityType, entityId])
+}

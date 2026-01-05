@@ -1,4 +1,6 @@
-# Kutunza POS - Quick Start Guide
+# Kutunza POS - Quick Start Guide (Web App)
+
+**NOTE**: This is a web application suite. No Electron installation required.
 
 ## 🚀 Getting Started
 

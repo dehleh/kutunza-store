@@ -1,4 +1,6 @@
-# Kutunza POS - Implementation Summary
+# Kutunza POS - Web Application Implementation Summary
+
+**NOTE**: This system is now a pure web application. All Electron-related code has been removed.
 
 ## ✅ Completed Features & Enhancements
 

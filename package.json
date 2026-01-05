@@ -1,78 +1,27 @@
 {
-  "name": "kutunza-pos",
+  "name": "kutunza-pos-monorepo",
   "version": "1.0.0",
-  "description": "Kutunza Gourmet POS - Inventory & Sales Management System",
-  "main": "dist/main/main.js",
+  "description": "Kutunza POS Web Application Suite",
+  "private": true,
+  "workspaces": [
+    "pos-web-app",
+    "customer-display",
+    "sync-server",
+    "sync-server/admin-dashboard"
+  ],
   "scripts": {
-    "dev": "concurrently \"npm run dev:renderer\" \"wait-on http://localhost:5173 && npm run dev:electron\"",
-    "dev:renderer": "vite",
-    "dev:electron": "tsc -p tsconfig.main.json && electron .",
-    "build": "npm run build:renderer && npm run build:electron",
-    "build:renderer": "tsc && vite build",
-    "build:electron": "tsc -p tsconfig.main.json",
-    "package": "npm run build && electron-builder",
-    "package:win": "npm run build && electron-builder --win",
-    "package:linux": "npm run build && electron-builder --linux"
-  },
-  "build": {
-    "appId": "com.kutunza.pos",
-    "productName": "Kutunza POS",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "public/**/*"
-    ],
-    "extraResources": [
-      {
-        "from": "prisma",
-        "to": "prisma"
-      }
-    ],
-    "win": {
-      "target": "nsis",
-      "icon": "public/icon.ico"
-    },
-    "linux": {
-      "target": "AppImage",
-      "icon": "public/icon.png"
-    }
-  },
-  "dependencies": {
-    "@prisma/client": "^5.7.0",
-    "better-sqlite3": "^9.2.2",
-    "electron-store": "^8.1.0",
-    "uuid": "^9.0.1",
-    "date-fns": "^3.0.6",
-    "node-thermal-printer": "^4.4.2",
-    "serialport": "^12.0.0"
+    "dev:all": "concurrently \"npm run dev --prefix sync-server\" \"npm run dev --prefix pos-web-app\" \"npm run dev --prefix customer-display\"",
+    "build:all": "npm run build --prefix sync-server && npm run build --prefix pos-web-app && npm run build --prefix customer-display",
+    "build": "cd sync-server && npm ci && npx prisma generate && npm run build",
+    "start": "cd sync-server && npm start",
+    "clean": "rm -rf */node_modules */dist */build .turbo",
+    "setup": "npm install && npm install --prefix pos-web-app && npm install --prefix customer-display && npm install --prefix sync-server && npm install --prefix sync-server/admin-dashboard"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.8",
-    "@types/node": "^20.10.5",
-    "@types/react": "^18.2.45",
-    "@types/react-dom": "^18.2.18",
-    "@types/uuid": "^9.0.7",
-    "@vitejs/plugin-react": "^4.2.1",
-    "autoprefixer": "^10.4.16",
-    "concurrently": "^8.2.2",
-    "electron": "^28.1.0",
-    "electron-builder": "^24.9.1",
-    "lucide-react": "^0.303.0",
-    "postcss": "^8.4.32",
-    "prisma": "^5.7.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-hot-toast": "^2.4.1",
-    "react-router-dom": "^6.21.1",
-    "tailwindcss": "^3.4.0",
-    "typescript": "^5.3.3",
-    "vite": "^5.0.10",
-    "wait-on": "^7.2.0",
-    "zustand": "^4.4.7"
+    "concurrently": "^8.2.2"
   },
-  "keywords": ["pos", "inventory", "sales", "kutunza", "gourmet"],
-  "author": "Kutunza Gourmet",
-  "license": "UNLICENSED"
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
 }

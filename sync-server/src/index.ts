@@ -2,6 +2,7 @@
 // Deployed on Railway with PostgreSQL
 
 import express from 'express';
+import { createServer } from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -31,9 +32,33 @@ import {
   analyticsParamsSchema,
   analyticsQuerySchema,
 } from './validators/schemas';
+import { WebSocketServer } from './config/websocket';
+import {
+  apiLimiter,
+  authLimiter,
+  syncLimiter,
+  reportLimiter,
+} from './middleware/rateLimiter';
+
+// Import route handlers
+import productsRouter from './routes/products';
+import usersRouter from './routes/users';
+import salesRouter from './routes/sales';
+import auditRouter from './routes/audit';
+import companiesRouter from './routes/companies';
+import {
+  healthCheck,
+  getMetrics,
+  getCriticalAlerts,
+  logSlowRequests,
+} from './middleware/monitoring';
 
 const app = express();
+const httpServer = createServer(app);
 const PORT = env.PORT;
+
+// Initialize WebSocket server
+const wsServer = new WebSocketServer(httpServer);
 
 // Middleware
 app.use(helmet());
@@ -45,30 +70,30 @@ app.use(
 );
 app.use(express.json({ limit: '10mb' }));
 app.use(httpLogger); // Log all HTTP requests
+app.use(logSlowRequests(1000)); // Log requests taking > 1s
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later',
-});
-app.use('/api/', limiter);
+// Apply general rate limiting to all API routes
+app.use('/api/', apiLimiter);
 
-// Health check (no authentication required)
-app.get('/health', async (req, res) => {
-  const dbHealth = await checkDatabaseHealth();
-  
-  res.status(dbHealth.healthy ? 200 : 503).json({
-    status: dbHealth.healthy ? 'ok' : 'degraded',
-    timestamp: new Date().toISOString(),
-    database: {
-      connected: dbHealth.healthy,
-      latency: `${dbHealth.latency}ms`,
-      error: dbHealth.error,
-    },
-    environment: env.NODE_ENV,
-  });
-});
+// Enhanced health check (no authentication required)
+app.get('/health', healthCheck);
+
+// Metrics endpoint (requires API key)
+app.get('/api/metrics', authenticateApiKey, getMetrics);
+
+// Critical alerts endpoint (requires API key)
+app.get('/api/alerts', authenticateApiKey, getCriticalAlerts);
+
+// ==================== API ROUTES ====================
+
+// Mount route handlers
+app.use('/api/auth', authLimiter, usersRouter); // Auth routes with strict rate limiting
+app.use('/api/platform', authLimiter, companiesRouter); // Platform login with strict rate limiting
+app.use('/api/companies', apiLimiter, companiesRouter); // Company management with standard rate limiting
+app.use('/api', productsRouter); // Products CRUD
+app.use('/api', usersRouter); // Users management
+app.use('/api', salesRouter); // Sales and reports
+app.use('/api', auditRouter); // Audit logs
 
 // ==================== SYNC ENDPOINTS ====================
 
@@ -125,6 +150,7 @@ app.post(
 // Pull changes from server
 app.post(
   '/api/sync/pull',
+  syncLimiter,
   authenticateApiKey,
   validate(syncPullSchema),
   validateStoreAccess,
@@ -370,6 +396,7 @@ async function handleStockMovementSync(operation: string, id: string, data: any)
 // Get store analytics
 app.get(
   '/api/analytics/:storeId',
+  reportLimiter,
   authenticateApiKey,
   validateParams(analyticsParamsSchema),
   validateQuery(analyticsQuerySchema),
@@ -442,6 +469,15 @@ app.get(
   }
 );
 
+// WebSocket stats endpoint
+app.get('/api/ws/stats', authenticateApiKey, (req, res) => {
+  const stats = wsServer.getStats();
+  res.json({
+    success: true,
+    data: stats,
+  });
+});
+
 // Start server with database connection check
 async function startServer() {
   // Test database connection before starting server
@@ -452,12 +488,13 @@ async function startServer() {
     process.exit(1);
   }
 
-  app.listen(PORT, () => {
+  httpServer.listen(PORT, () => {
     logger.info(
       {
         port: PORT,
         environment: env.NODE_ENV,
         nodeVersion: process.version,
+        websocket: 'enabled',
       },
       '🚀 Kutunza POS Sync Server started successfully'
     );
