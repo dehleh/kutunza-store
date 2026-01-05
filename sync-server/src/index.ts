@@ -75,6 +75,20 @@ app.use(logSlowRequests(1000)); // Log requests taking > 1s
 // Apply general rate limiting to all API routes
 app.use('/api/', apiLimiter);
 
+// Root endpoint - API information
+app.get('/', (req, res) => {
+  res.json({
+    name: 'Kutunza POS Sync Server',
+    version: '1.0.0',
+    status: 'running',
+    endpoints: {
+      health: '/health',
+      api: '/api',
+      docs: 'https://github.com/dehleh/kutunza-store'
+    }
+  });
+});
+
 // Enhanced health check (no authentication required)
 app.get('/health', healthCheck);
 
