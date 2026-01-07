@@ -22,7 +22,7 @@ export default function HealthMonitor() {
     );
   }
 
-  const isHealthy = health?.status === 'ok' && health?.database.connected;
+  const isHealthy = health?.status === 'ok' && health?.database?.connected;
 
   return (
     <div>
@@ -49,13 +49,13 @@ export default function HealthMonitor() {
         <div className="stat-card">
           <div className="stat-header">
             <span className="stat-title">Database</span>
-            <div className={`stat-icon ${health?.database.connected ? 'success' : 'danger'}`}>
+            <div className={`stat-icon ${health?.database?.connected ? 'success' : 'danger'}`}>
               <Database size={20} />
             </div>
           </div>
-          <div className={`status-indicator ${health?.database.connected ? 'healthy' : 'degraded'}`}>
+          <div className={`status-indicator ${health?.database?.connected ? 'healthy' : 'degraded'}`}>
             <span className="status-dot"></span>
-            {health?.database.connected ? 'Connected' : 'Disconnected'}
+            {health?.database?.connected ? 'Connected' : 'Disconnected'}
           </div>
         </div>
 
@@ -66,7 +66,7 @@ export default function HealthMonitor() {
               <Activity size={20} />
             </div>
           </div>
-          <div className="stat-value">{health?.database.latency || 'N/A'}</div>
+          <div className="stat-value">{health?.database?.latency || 'N/A'}</div>
         </div>
 
         <div className="stat-card">
@@ -104,20 +104,20 @@ export default function HealthMonitor() {
           <div className="info-item">
             <span className="info-label">Database Connected</span>
             <span className="info-value">
-              {health?.database.connected ? 'Yes' : 'No'}
+              {health?.database?.connected ? 'Yes' : 'No'}
             </span>
           </div>
 
           <div className="info-item">
             <span className="info-label">Database Latency</span>
-            <span className="info-value">{health?.database.latency}</span>
+            <span className="info-value">{health?.database?.latency}</span>
           </div>
 
-          {health?.database.error && (
+          {health?.database?.error && (
             <div className="info-item">
               <span className="info-label">Database Error</span>
               <span className="info-value" style={{ color: '#ef4444' }}>
-                {health.database.error}
+                {health?.database?.error}
               </span>
             </div>
           )}
