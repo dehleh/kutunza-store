@@ -1,6 +1,7 @@
 # Sync Server Admin Dashboard - Static Site Configuration
 [variables]
 NODE_ENV = "production"
+VITE_API_URL = "https://kutunza-store-production.up.railway.app"
 
 [phases.setup]
 nixPkgs = ["nodejs_22"]
