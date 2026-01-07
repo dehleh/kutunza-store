@@ -9,7 +9,6 @@ export const apiLimiter = rateLimit({
   message: 'Too many requests from this IP, please try again later',
   standardHeaders: true,
   legacyHeaders: false,
-  trustProxy: true, // Trust Railway proxy
   handler: (req: Request, res: Response) => {
     logger.warn(
       { ip: req.ip, path: req.path },
@@ -28,7 +27,6 @@ export const authLimiter = rateLimit({
   max: 5,
   skipSuccessfulRequests: true,
   message: 'Too many login attempts, please try again later',
-  trustProxy: true, // Trust Railway proxy
   handler: (req: Request, res: Response) => {
     logger.warn(
       { ip: req.ip, username: req.body?.username },
@@ -46,7 +44,6 @@ export const syncLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 50,
   message: 'Too many sync requests',
-  trustProxy: true, // Trust Railway proxy
   handler: (req: Request, res: Response) => {
     logger.warn(
       { ip: req.ip, storeId: req.body?.storeId },
@@ -64,7 +61,6 @@ export const reportLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
   max: 10,
   message: 'Too many report requests',
-  trustProxy: true, // Trust Railway proxy
 });
 
 // Request size limiter middleware

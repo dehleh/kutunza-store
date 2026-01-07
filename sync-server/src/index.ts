@@ -57,6 +57,9 @@ const app = express();
 const httpServer = createServer(app);
 const PORT = env.PORT;
 
+// Trust Railway proxy
+app.set('trust proxy', 1);
+
 // Initialize WebSocket server
 const wsServer = new WebSocketServer(httpServer);
 
