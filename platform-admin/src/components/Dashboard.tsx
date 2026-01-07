@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Building2, Users, DollarSign, LogOut } from 'lucide-react';
+import { Building2, Users, DollarSign, LogOut, List, LayoutDashboard } from 'lucide-react';
+import CompanyList from './CompanyList';
 
 interface Admin {
   email: string;
@@ -8,15 +9,37 @@ interface Admin {
   role: string;
 }
 
+type View = 'overview' | 'companies';
+
 export default function Dashboard() {
   const [admin, setAdmin] = useState<Admin | null>(null);
+  const [activeView, setActiveView] = useState<View>('overview');
+  const [stats, setStats] = useState({ companies: 0, stores: 0 });
 
   useEffect(() => {
     const stored = localStorage.getItem('platformAdmin');
     if (stored) {
       setAdmin(JSON.parse(stored));
     }
+    fetchStats();
   }, []);
+
+  const fetchStats = async () => {
+    try {
+      const token = localStorage.getItem('platformToken');
+      const response = await fetch('https://kutunza-store-production.up.railway.app/api/companies', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (data.data) {
+        const companies = data.data.length;
+        const stores = data.data.reduce((sum: number, c: any) => sum + (c._count?.stores || 0), 0);
+        setStats({ companies, stores });
+      }
+    } catch (error) {
+      console.error('Failed to fetch stats:', error);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('platformToken');
@@ -45,55 +68,93 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Companies</p>
-                <p className="text-3xl font-bold text-gray-900">-</p>
-              </div>
-              <Building2 className="text-indigo-600" size={40} />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Stores</p>
-                <p className="text-3xl font-bold text-gray-900">-</p>
-              </div>
-              <Users className="text-green-600" size={40} />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Revenue</p>
-                <p className="text-3xl font-bold text-gray-900">-</p>
-              </div>
-              <DollarSign className="text-blue-600" size={40} />
-            </div>
-          </div>
+      <div className="flex">
+        {/* Sidebar */}
+        <div className="w-64 bg-white shadow-md min-h-[calc(100vh-73px)]">
+          <nav className="p-4 space-y-2">
+            <button
+              onClick={() => setActiveView('overview')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                activeView === 'overview'
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <LayoutDashboard size={20} />
+              Overview
+            </button>
+            <button
+              onClick={() => setActiveView('companies')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                activeView === 'companies'
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <List size={20} />
+              Companies
+            </button>
+          </nav>
         </div>
 
-        {/* Main content */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Platform Management</h2>
-          <p className="text-gray-600">
-            Platform admin dashboard is under construction. You can use the API endpoints to:
-          </p>
-          <ul className="mt-4 space-y-2 text-gray-600">
-            <li>• <code className="bg-gray-100 px-2 py-1 rounded">GET /api/companies</code> - List all companies</li>
-            <li>• <code className="bg-gray-100 px-2 py-1 rounded">POST /api/companies/register</code> - Register new company</li>
-            <li>• <code className="bg-gray-100 px-2 py-1 rounded">GET /api/companies/:id</code> - Get company details</li>
-            <li>• <code className="bg-gray-100 px-2 py-1 rounded">PATCH /api/companies/:id/subscription</code> - Update subscription</li>
-          </ul>
-          <p className="mt-4 text-sm text-gray-500">
-            API Base URL: https://kutunza-store-production.up.railway.app
-          </p>
+        {/* Content */}
+        <div className="flex-1 p-8">
+          {activeView === 'overview' && (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="bg-white rounded-lg shadow p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600">Total Companies</p>
+                      <p className="text-3xl font-bold text-gray-900">{stats.companies}</p>
+                    </div>
+                    <Building2 className="text-indigo-600" size={40} />
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-lg shadow p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600">Total Stores</p>
+                      <p className="text-3xl font-bold text-gray-900">{stats.stores}</p>
+                    </div>
+                    <Users className="text-green-600" size={40} />
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-lg shadow p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600">Revenue</p>
+                      <p className="text-3xl font-bold text-gray-900">-</p>
+                    </div>
+                    <DollarSign className="text-blue-600" size={40} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    onClick={() => setActiveView('companies')}
+                    className="p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition text-left"
+                  >
+                    <Building2 className="text-indigo-600 mb-2" size={24} />
+                    <h3 className="font-semibold text-gray-900">Manage Companies</h3>
+                    <p className="text-sm text-gray-600">View and manage all companies</p>
+                  </button>
+                  <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg opacity-50">
+                    <DollarSign className="text-gray-400 mb-2" size={24} />
+                    <h3 className="font-semibold text-gray-600">Billing Reports</h3>
+                    <p className="text-sm text-gray-500">Coming soon</p>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {activeView === 'companies' && <CompanyList />}
         </div>
       </div>
     </div>
