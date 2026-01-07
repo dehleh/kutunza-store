@@ -64,10 +64,12 @@ const wsServer = new WebSocketServer(httpServer);
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
+
+// Configure CORS to allow all origins
 app.use(
   cors({
-    origin: env.ALLOWED_ORIGINS === '*' ? true : env.ALLOWED_ORIGINS.split(','),
-    credentials: true,
+    origin: '*',
+    credentials: false, // Must be false when origin is '*'
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
