@@ -323,7 +323,7 @@ router.post('/register', async (req, res) => {
 // ==================== PROTECTED COMPANY ROUTES ====================
 
 // List all companies (super admin only)
-router.get('/companies', authenticatePlatformAdmin, requireSuperAdmin, async (req, res) => {
+router.get('/', authenticatePlatformAdmin, requireSuperAdmin, async (req, res) => {
   try {
     const { search, status, plan, page = '1', limit = '50' } = req.query;
 
