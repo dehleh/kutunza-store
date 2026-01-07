@@ -6,6 +6,12 @@ import { z } from 'zod';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
+import { Prisma } from '@prisma/client';
+
+// Type for PlatformAdmin with company included
+type PlatformAdminWithCompany = Prisma.PlatformAdminGetPayload<{
+  include: { company: true };
+}>;
 
 const router = Router();
 
@@ -116,7 +122,7 @@ router.post('/login', async (req, res) => {
         where: { email },
         include: { company: true },
       })
-    );
+    ) as PlatformAdminWithCompany | null;
 
     if (!admin || !admin.isActive) {
       return res.status(401).json({ error: 'Invalid credentials' });
@@ -218,7 +224,7 @@ router.post('/register', async (req, res) => {
     const currentPeriodEnd = new Date(trialEndsAt);
 
     // Create company with admin and initial store in a transaction
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Create company
       const company = await tx.company.create({
         data: {

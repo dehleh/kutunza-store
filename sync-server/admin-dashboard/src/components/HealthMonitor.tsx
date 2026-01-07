@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { checkHealth } from '../config/api';
+import type { HealthResponse } from '../config/api';
 import { Activity, Database, Server, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function HealthMonitor() {
-  const { data: health, isLoading, error } = useQuery({
+  const { data: health, isLoading, error } = useQuery<HealthResponse>({
     queryKey: ['health'],
     queryFn: checkHealth,
     refetchInterval: 5000, // Check every 5 seconds

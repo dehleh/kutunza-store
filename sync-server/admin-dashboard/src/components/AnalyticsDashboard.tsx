@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getAnalytics } from '../config/api';
+import type { AnalyticsResponse } from '../config/api';
 import { TrendingUp, Users, DollarSign, ShoppingCart } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
+type TopProduct = AnalyticsResponse['topProducts'][number];
 
 export default function AnalyticsDashboard() {
   const [storeId, setStoreId] = useState('');
@@ -11,11 +14,12 @@ export default function AnalyticsDashboard() {
     end: new Date().toISOString(),
   };
 
-  const { data: analytics, isLoading, error } = useQuery({
+  const { data: analytics, isLoading, error } = useQuery<AnalyticsResponse>({
     queryKey: ['analytics', storeId, dateRange],
     queryFn: () => getAnalytics(storeId, dateRange.start, dateRange.end),
     enabled: !!storeId,
   });
+
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-MW', {
@@ -130,7 +134,7 @@ export default function AnalyticsDashboard() {
                     dataKey="productId" 
                     stroke="#94a3b8"
                     tick={{ fill: '#94a3b8' }}
-                    tickFormatter={(value) => value.substring(0, 8)}
+                    tickFormatter={(value: string) => value.substring(0, 8)}
                   />
                   <YAxis stroke="#94a3b8" tick={{ fill: '#94a3b8' }} />
                   <Tooltip 
@@ -172,7 +176,7 @@ export default function AnalyticsDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {analytics.topProducts.map((product) => (
+                  {analytics.topProducts.map((product: TopProduct) => (
                     <tr key={product.productId} style={{ borderBottom: '1px solid #334155' }}>
                       <td style={{ padding: '0.75rem', color: '#f8fafc' }}>
                         {product.productId.substring(0, 24)}...
