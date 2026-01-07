@@ -74,7 +74,7 @@ app.use(
     origin: '*',
     credentials: false, // Must be false when origin is '*'
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
   })
 );
 app.use(express.json({ limit: '10mb' }));
