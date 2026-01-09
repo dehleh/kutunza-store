@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Building2, Eye, Edit, Trash2, Plus } from 'lucide-react';
+import { fetchWithAuth, API_BASE_URL } from '../lib/api';
 
 interface Company {
   id: string;
@@ -18,6 +19,7 @@ export default function CompanyList() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     fetchCompanies();
@@ -25,16 +27,18 @@ export default function CompanyList() {
 
   const fetchCompanies = async () => {
     try {
-      const token = localStorage.getItem('platformToken');
-      const response = await fetch('https://kutunza-store-production.up.railway.app/api/companies', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      setError('');
+      const response = await fetchWithAuth('/api/companies');
+      if (!response.ok) {
+        throw new Error('Failed to fetch companies');
+      }
       const data = await response.json();
       setCompanies(data.data || []);
     } catch (error) {
       console.error('Failed to fetch companies:', error);
+      if (error instanceof Error) {
+        setError(error.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -56,6 +60,12 @@ export default function CompanyList() {
           Add Company
         </button>
       </div>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+          {error}
+        </div>
+      )}
 
       {showAddForm && (
         <AddCompanyForm 
@@ -157,7 +167,7 @@ function AddCompanyForm({ onClose, onSuccess }: { onClose: () => void; onSuccess
     setLoading(true);
 
     try {
-      const response = await fetch('https://kutunza-store-production.up.railway.app/api/companies/register', {
+      const response = await fetch(`${API_BASE_URL}/api/companies/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -50,6 +50,16 @@ npx prisma generate
 npx prisma migrate dev
 ```
 
+### 3b. Enable Refresh Tokens (required after Jan 2026 update)
+```bash
+npm install
+npx prisma generate
+npx prisma migrate deploy
+```
+
+- Ensure `ALLOWED_ORIGINS` in `.env` lists the exact URLs of the Platform Admin UI so the secure refresh cookie can be sent.
+- Redeploy the sync server after running the migration so the new `/api/platform/refresh` and `/api/platform/logout` endpoints are available.
+
 ### 4. Start Development Server
 ```bash
 npm run dev
@@ -96,6 +106,12 @@ Header: x-api-key: your-api-key
 ```
 Header: Authorization: Bearer your-jwt-token
 ```
+
+Platform admin tokens now support silent refresh:
+
+- Access tokens are short-lived (15 minutes) and returned by `/api/platform/login` and `/api/platform/refresh`.
+- Refresh tokens are HttpOnly cookies scoped to `/api/platform` and rotate automatically on each refresh call.
+- Use `/api/platform/logout` to revoke the refresh token and clear the cookie.
 
 ### Endpoints
 

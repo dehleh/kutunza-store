@@ -7,6 +7,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
 
 // Load environment variables first
 dotenv.config();
@@ -68,16 +69,21 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-// Configure CORS to allow all origins
+const allowedOrigins = env.ALLOWED_ORIGINS
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 app.use(
   cors({
-    origin: '*',
-    credentials: false, // Must be false when origin is '*'
+    origin: env.ALLOWED_ORIGINS === '*' ? true : allowedOrigins,
+    credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
   })
 );
 app.use(express.json({ limit: '10mb' }));
+app.use(cookieParser());
 app.use(httpLogger); // Log all HTTP requests
 app.use(logSlowRequests(1000)); // Log requests taking > 1s
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Lock, Mail } from 'lucide-react';
+import { API_BASE_URL, storeSession, clearSession } from '../lib/api';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -13,9 +14,10 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const response = await fetch('https://kutunza-store-production.up.railway.app/api/platform/login', {
+      const response = await fetch(`${API_BASE_URL}/api/platform/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
 
@@ -25,9 +27,8 @@ export default function Login() {
         throw new Error(data.error || 'Login failed');
       }
 
-      // Store token
-      localStorage.setItem('platformToken', data.token);
-      localStorage.setItem('platformAdmin', JSON.stringify(data.admin));
+      clearSession();
+      storeSession(data.token, data.admin);
       
       // Reload to show dashboard
       window.location.reload();

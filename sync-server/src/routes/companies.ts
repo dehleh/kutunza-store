@@ -1,12 +1,13 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Request, Response, NextFunction, CookieOptions } from 'express';
 import { prisma, withRetry } from '../config/database';
 import { logger } from '../config/logger';
 import { getSubscriptionStatus } from '../middleware/subscription';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import { Prisma } from '@prisma/client';
+import { env } from '../config/env';
 
 // Type for PlatformAdmin with company included
 type PlatformAdminWithCompany = Prisma.PlatformAdminGetPayload<{
@@ -14,6 +15,73 @@ type PlatformAdminWithCompany = Prisma.PlatformAdminGetPayload<{
 }>;
 
 const router = Router();
+
+const ACCESS_TOKEN_EXPIRES_IN = '15m';
+const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+const refreshCookieOptions: CookieOptions = {
+  httpOnly: true,
+  secure: env.NODE_ENV === 'production',
+  sameSite: env.NODE_ENV === 'production' ? 'none' : 'lax',
+  path: '/api/platform',
+  maxAge: REFRESH_TOKEN_TTL_MS,
+};
+
+const clearRefreshCookie = (res: Response) => {
+  res.clearCookie('refreshToken', { ...refreshCookieOptions, maxAge: undefined });
+};
+
+const sanitizeAdmin = (admin: PlatformAdminWithCompany) => ({
+  id: admin.id,
+  email: admin.email,
+  firstName: admin.firstName,
+  lastName: admin.lastName,
+  role: admin.role,
+  companyId: admin.companyId,
+  company: admin.company,
+  permissions: {
+    canManageCompanies: admin.canManageCompanies,
+    canManageBilling: admin.canManageBilling,
+    canViewAllStores: admin.canViewAllStores,
+  },
+});
+
+const createRefreshTokenValue = () => `${randomUUID()}.${randomUUID()}`;
+
+const hashRefreshToken = (token: string) =>
+  createHash('sha256').update(token).digest('hex');
+
+const generateAccessToken = (admin: PlatformAdminWithCompany) =>
+  jwt.sign(
+    {
+      adminId: admin.id,
+      email: admin.email,
+      role: admin.role,
+      companyId: admin.companyId,
+      type: 'platform_admin',
+    },
+    env.JWT_SECRET,
+    { expiresIn: ACCESS_TOKEN_EXPIRES_IN }
+  );
+
+const issueTokens = async (admin: PlatformAdminWithCompany, res: Response) => {
+  const accessToken = generateAccessToken(admin);
+  const refreshToken = createRefreshTokenValue();
+  const refreshTokenHash = hashRefreshToken(refreshToken);
+  const refreshTokenExpiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
+
+  await prisma.platformAdmin.update({
+    where: { id: admin.id },
+    data: {
+      refreshTokenHash,
+      refreshTokenExpiresAt,
+    },
+  });
+
+  res.cookie('refreshToken', refreshToken, refreshCookieOptions);
+
+  return { accessToken };
+};
 
 // Extend Express Request type to include platformAdmin
 declare global {
@@ -78,7 +146,7 @@ const authenticatePlatformAdmin = async (req: any, res: any, next: any) => {
     }
 
     const token = authHeader.substring(7);
-    const decoded: any = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    const decoded: any = jwt.verify(token, env.JWT_SECRET);
     
     if (decoded.type !== 'platform_admin') {
       return res.status(403).json({ error: 'Forbidden: Platform admin access required' });
@@ -133,47 +201,85 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Update last login
+    // Update last login timestamp
     await prisma.platformAdmin.update({
       where: { id: admin.id },
       data: { lastLoginAt: new Date() },
     });
 
-    // Generate JWT
-    const token = jwt.sign(
-      {
-        adminId: admin.id,
-        email: admin.email,
-        role: admin.role,
-        companyId: admin.companyId,
-        type: 'platform_admin',
-      },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '24h' }
-    );
+    const { accessToken } = await issueTokens(admin, res);
 
     res.json({
       success: true,
-      token,
-      admin: {
-        id: admin.id,
-        email: admin.email,
-        firstName: admin.firstName,
-        lastName: admin.lastName,
-        role: admin.role,
-        companyId: admin.companyId,
-        company: admin.company,
-        permissions: {
-          canManageCompanies: admin.canManageCompanies,
-          canManageBilling: admin.canManageBilling,
-          canViewAllStores: admin.canViewAllStores,
-        },
-      },
+      token: accessToken,
+      admin: sanitizeAdmin(admin),
     });
 
     logger.info({ adminId: admin.id, email: admin.email }, 'Platform admin logged in');
   } catch (error: any) {
     logger.error({ error: error.message }, 'Platform admin login failed');
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/refresh', async (req, res) => {
+  try {
+    const presentedRefreshToken = req.cookies?.refreshToken;
+
+    if (!presentedRefreshToken) {
+      return res.status(401).json({ error: 'Refresh token missing' });
+    }
+
+    const refreshTokenHash = hashRefreshToken(presentedRefreshToken);
+    const admin = await prisma.platformAdmin.findFirst({
+      where: {
+        refreshTokenHash,
+        isActive: true,
+        refreshTokenExpiresAt: {
+          gt: new Date(),
+        },
+      },
+      include: { company: true },
+    }) as PlatformAdminWithCompany | null;
+
+    if (!admin) {
+      clearRefreshCookie(res);
+      return res.status(401).json({ error: 'Invalid refresh token' });
+    }
+
+    const { accessToken } = await issueTokens(admin, res);
+
+    res.json({
+      success: true,
+      token: accessToken,
+      admin: sanitizeAdmin(admin),
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message }, 'Platform admin refresh failed');
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/logout', async (req, res) => {
+  try {
+    const presentedRefreshToken = req.cookies?.refreshToken;
+
+    if (presentedRefreshToken) {
+      const refreshTokenHash = hashRefreshToken(presentedRefreshToken);
+      await prisma.platformAdmin.updateMany({
+        where: { refreshTokenHash },
+        data: {
+          refreshTokenHash: null,
+          refreshTokenExpiresAt: null,
+        },
+      });
+    }
+
+    clearRefreshCookie(res);
+
+    res.json({ success: true, message: 'Logged out' });
+  } catch (error: any) {
+    logger.error({ error: error.message }, 'Platform admin logout failed');
     res.status(500).json({ error: 'Internal server error' });
   }
 });

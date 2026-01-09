@@ -1,18 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Building2, Users, DollarSign, LogOut, List, LayoutDashboard } from 'lucide-react';
 import CompanyList from './CompanyList';
-
-interface Admin {
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: string;
-}
+import { fetchWithAuth, logoutRequest, clearSession } from '../lib/api';
+import type { PlatformAdmin } from '../lib/api';
 
 type View = 'overview' | 'companies';
 
 export default function Dashboard() {
-  const [admin, setAdmin] = useState<Admin | null>(null);
+  const [admin, setAdmin] = useState<PlatformAdmin | null>(null);
   const [activeView, setActiveView] = useState<View>('overview');
   const [stats, setStats] = useState({ companies: 0, stores: 0 });
 
@@ -26,10 +21,7 @@ export default function Dashboard() {
 
   const fetchStats = async () => {
     try {
-      const token = localStorage.getItem('platformToken');
-      const response = await fetch('https://kutunza-store-production.up.railway.app/api/companies', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
+      const response = await fetchWithAuth('/api/companies');
       const data = await response.json();
       if (data.data) {
         const companies = data.data.length;
@@ -42,9 +34,14 @@ export default function Dashboard() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('platformToken');
-    localStorage.removeItem('platformAdmin');
-    window.location.reload();
+    logoutRequest()
+      .catch((error) => {
+        console.error('Logout failed', error);
+        clearSession();
+      })
+      .finally(() => {
+        window.location.reload();
+      });
   };
 
   return (

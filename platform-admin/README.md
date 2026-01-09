@@ -1,73 +1,78 @@
-# React + TypeScript + Vite
+# Kutunza Platform Admin Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Administrative console for onboarding companies, monitoring tenants, and issuing platform-level actions against the Kutunza Sync Server.
 
-Currently, two official plugins are available:
+## ✨ Highlights
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- React 19 + Vite 6 for fast development
+- Token-aware networking with automatic refresh + logout fallbacks
+- Tailwind-based UI with Lucide icons
+- Environment-driven API base URL for staging/production isolation
 
-## React Compiler
+## 📋 Prerequisites
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Node.js 18+
+- npm 10+
+- Access to a running Sync Server (the value used for `VITE_API_URL`)
 
-## Expanding the ESLint configuration
+## ⚙️ Environment Setup
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+1. Copy the example file and edit the API origin:
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cp .env.example .env
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+`.env`:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```env
+VITE_API_URL="https://your-sync-server.example.com"
 ```
+
+> Use the absolute origin (protocol + host) of the sync-server deployment. The Platform Admin UI automatically sends credentials so the server can manage refresh cookies.
+
+## 🛠️ Local Development
+
+```bash
+npm install
+npm run dev
+```
+
+The dev server starts on http://localhost:5173 and proxies API calls directly to `VITE_API_URL`.
+
+## 🧱 Production Build
+
+```bash
+npm run build
+npm run preview   # optional smoke test of the dist bundle
+```
+
+Deploy the contents of `dist/` to your hosting provider (Railway static service, S3 + CloudFront, etc.).
+
+## 🔐 Session Refresh Flow
+
+- On login the UI stores the short-lived access token in `localStorage`; the server sets a HttpOnly refresh cookie.
+- All API calls go through a shared helper which retries once on HTTP 401 by calling `/api/platform/refresh` (credentials included).
+- If refresh fails, the helper clears local storage and surfaces a “Session expired” error so the user can log in again.
+- Clicking **Logout** calls `/api/platform/logout`, revoking the refresh token server-side before clearing local storage.
+
+Ensure the sync server’s `ALLOWED_ORIGINS` list contains the deployed Platform Admin origin so cookies are accepted.
+
+## 📜 Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start Vite dev server |
+| `npm run build` | Build production bundle |
+| `npm run preview` | Preview the built assets locally |
+| `npm run lint` | Run ESLint (if configured) |
+
+## 🧪 Troubleshooting
+
+- **401 Unauthorized**: The sync server likely restarted or the refresh cookie expired. The UI should redirect to login automatically; if not, clear storage/cookies and reload.
+- **CORS errors**: Double-check `ALLOWED_ORIGINS` on the sync server and ensure the Platform Admin URL is listed exactly.
+- **Missing env**: Build fails with `VITE_API_URL` undefined if `.env` is not configured. Copy `.env.example` before building.
+
+## 🤝 Contributions
+
+PRs are welcome. Please run `npm run build` before submitting to ensure the refreshed auth flow remains intact.

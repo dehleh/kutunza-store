@@ -57,6 +57,8 @@ model PlatformAdmin {
   firstName   String
   lastName    String
   role        String   @default("company_admin") // super_admin, company_admin
+  refreshTokenHash      String?
+  refreshTokenExpiresAt DateTime?
   
   // Permissions
   canManageCompanies Boolean @default(false)
