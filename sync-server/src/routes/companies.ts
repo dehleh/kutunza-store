@@ -328,57 +328,95 @@ router.post('/register', async (req, res) => {
 
 // ==================== PROTECTED COMPANY ROUTES ====================
 
-// List all companies (super admin only)
-router.get('/', authenticatePlatformAdmin, requireSuperAdmin, async (req, res) => {
+// List companies (super admins get all; company admins get only their company)
+router.get('/', authenticatePlatformAdmin, async (req, res) => {
   try {
-    const { search, status, plan, page = '1', limit = '50' } = req.query;
+    const admin = req.platformAdmin;
+    const isSuperAdmin = admin.role === 'super_admin';
 
-    const where: any = {};
-    
-    if (search) {
-      where.OR = [
-        { name: { contains: search as string, mode: 'insensitive' } },
-        { email: { contains: search as string, mode: 'insensitive' } },
-        { slug: { contains: search as string, mode: 'insensitive' } },
-      ];
+    // Super admins retain full search/pagination; company admins only see their own company
+    if (isSuperAdmin) {
+      const { search, status, plan, page = '1', limit = '50' } = req.query;
+
+      const where: any = {};
+      
+      if (search) {
+        where.OR = [
+          { name: { contains: search as string, mode: 'insensitive' } },
+          { email: { contains: search as string, mode: 'insensitive' } },
+          { slug: { contains: search as string, mode: 'insensitive' } },
+        ];
+      }
+      
+      if (status) where.status = status;
+      if (plan) where.plan = plan;
+
+      const pageNum = parseInt(page as string);
+      const limitNum = parseInt(limit as string);
+
+      const [companies, total] = await withRetry(() =>
+        Promise.all([
+          prisma.company.findMany({
+            where,
+            skip: (pageNum - 1) * limitNum,
+            take: limitNum,
+            include: {
+              _count: {
+                select: { stores: true, platformAdmins: true },
+              },
+              subscriptions: {
+                where: { status: 'active' },
+                take: 1,
+                orderBy: { createdAt: 'desc' },
+              },
+            },
+            orderBy: { createdAt: 'desc' },
+          }),
+          prisma.company.count({ where }),
+        ])
+      );
+
+      return res.json({
+        success: true,
+        data: companies,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          pages: Math.ceil(total / limitNum),
+        },
+      });
     }
-    
-    if (status) where.status = status;
-    if (plan) where.plan = plan;
 
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
-
-    const [companies, total] = await withRetry(() =>
-      Promise.all([
-        prisma.company.findMany({
-          where,
-          skip: (pageNum - 1) * limitNum,
-          take: limitNum,
-          include: {
-            _count: {
-              select: { stores: true, platformAdmins: true },
-            },
-            subscriptions: {
-              where: { status: 'active' },
-              take: 1,
-              orderBy: { createdAt: 'desc' },
-            },
+    // Company admin path: return only their company to avoid 403s in the platform-admin UI
+    const company = await withRetry(() =>
+      prisma.company.findUnique({
+        where: { id: admin.companyId },
+        include: {
+          _count: {
+            select: { stores: true, platformAdmins: true },
           },
-          orderBy: { createdAt: 'desc' },
-        }),
-        prisma.company.count({ where }),
-      ])
+          subscriptions: {
+            where: { status: 'active' },
+            take: 1,
+            orderBy: { createdAt: 'desc' },
+          },
+        },
+      })
     );
+
+    if (!company) {
+      return res.status(404).json({ error: 'Company not found for admin' });
+    }
 
     res.json({
       success: true,
-      data: companies,
+      data: [company],
       pagination: {
-        page: pageNum,
-        limit: limitNum,
-        total,
-        pages: Math.ceil(total / limitNum),
+        page: 1,
+        limit: 1,
+        total: 1,
+        pages: 1,
       },
     });
   } catch (error: any) {
